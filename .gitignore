@@ -4,3 +4,9 @@
 
 # DS_Store
 .DS_Store
+
+# Jupyter Notebook files
+.ipynb_checkpoints/
+
+# Python Cache files
+__pycache__/
