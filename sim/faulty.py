@@ -1,7 +1,12 @@
+from .sim import DiscreteEventSimulator
+
 import random
 
-class DiscreteEventSimulator:
-    
+class FaultySimulator (DiscreteEventSimulator):
+
+    # - nodes: graph nodes
+    # - distances: distances between each node 
+    # - fault_chance: probability of losing a message in simulation
     def __init__(self, nodes, distances, fault_chance = 0):
         
         # nodes
@@ -21,16 +26,6 @@ class DiscreteEventSimulator:
 
     def start(self, initial_data, initial_node):
         
-        pass
-
-    def loop(self):
-        
-        pass
-
-class SimulatorImplementation (Simulator):
-
-    def start(self, initial_data, initial_node):
-        
         # starting randomizer
         random.seed()
         
@@ -41,9 +36,9 @@ class SimulatorImplementation (Simulator):
         self.pending.append( (instant, (src, dst, data )) )
         
         # run the loop
-        return self.loop()
+        return self.__loop__()
 
-    def loop(self):
+    def __loop__(self):
         
         # creating a sorted event list
         ordered_events = []
