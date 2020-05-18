@@ -60,12 +60,12 @@ class FaultySimulator(DiscreteEventSimulator):
             self.pending.remove(event)
 
             # skipping event based on fault probability
-            if random.random() < self.fault_chance:
+            if src != dst and random.random() < self.fault_chance:
                 # skipping iteration
                 continue
 
             # executing event if event is valid
-            if (src, dst) in self.distances or src is None:
+            if (src, dst) in self.distances or (dst, src) in self.distances or src is None:
                 # appending event to sorted event list
                 ordered_events.append(event)
 
@@ -89,7 +89,12 @@ class FaultySimulator(DiscreteEventSimulator):
         # generating events for each data
         for (new_dst, new_data, delay) in new_datas:
             # get distance to node
-            distance = self.distances[(new_src, new_dst)]
+            distance = 0
+            if (new_src, new_dst) in self.distances:
+                distance = self.distances[(new_src, new_dst)]
+
+            elif (new_dst, new_src) in self.distances:
+                distance = self.distances[(new_dst, new_src)]
 
             # creating new event
             new_event = (instant + distance + delay, (new_src, new_dst, new_data))

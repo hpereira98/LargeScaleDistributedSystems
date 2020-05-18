@@ -2,20 +2,20 @@ from .node import Node
 
 from enum import Enum
 
-class HybridNode (Node):
+
+class HybridNode(Node):
 
     # - id: identification number 
     # - role: node role in the network
     # - neighbors: adjacent nodes id's
-    def __init__ (self, id, role, neighbors):
+    def __init__(self, id, role, neighbors):
 
         self.id = id
         self.role = role
         self.neighbors = neighbors
 
+    def handle(self, src, data):
 
-    def handle (self, src, data):
-        
         # unpacking data 
         type, id, payload = data
 
@@ -44,34 +44,33 @@ class HybridNode (Node):
 
             return []
 
+    def __gossip__(self, src, id, payload):
 
-    def __gossip__ (self, src, id, payload):
-        
         return [self.role, "GOSSIP", payload]
 
-    def __ihave__ (self, src, id):  
-        
+    def __ihave__(self, src, id):
+
         return []
 
-    def __ack__ (self, src, id):
-        
+    def __ack__(self, src, id):
+
         return []
 
-    def __ask__ (self, src, id):
-        
+    def __ask__(self, src, id):
+
         return []
 
-    def __periodic__ (self, src, id):
-        
+    def __periodic__(self, src, id):
+
         return []
 
-    def __gc__ (self, src):
-        
+    def __gc__(self, src):
+
         return []
+
 
 # different types of messages recognized by this type of node
 class MessageType(Enum):
-        
     GOSSIP = 1
     IHAVE = 2
     ASK = 3
@@ -79,8 +78,8 @@ class MessageType(Enum):
     GC = 5
     ACK = 6
 
+
 # different types of hybrid node
-class HybridRole (Enum):
-        
+class HybridRole(Enum):
     PRIMARY = 1
     SECUNDARY = 2
