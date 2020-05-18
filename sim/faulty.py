@@ -2,13 +2,14 @@ from .sim import DiscreteEventSimulator
 
 import random
 
-class FaultySimulator (DiscreteEventSimulator):
+
+class FaultySimulator(DiscreteEventSimulator):
 
     # - nodes: graph nodes
     # - distances: distances between each node 
     # - fault_chance: probability of losing a message in simulation
-    def __init__(self, nodes, distances, fault_chance = 0):
-        
+    def __init__(self, nodes, distances, fault_chance=0):
+
         # nodes
         self.nodes = nodes
 
@@ -19,27 +20,27 @@ class FaultySimulator (DiscreteEventSimulator):
         self.current_instant = 0
 
         # events pending execution [(instant, (src, dst, data))]
-        self.pending = []  
+        self.pending = []
 
         # probability of losing an event
         self.fault_chance = fault_chance
 
     def start(self, initial_data, initial_node):
-        
+
         # starting randomizer
         random.seed()
-        
+
         # creating first event [instant, (src, dst, data)]
         instant, src, dst, data = 0, None, initial_node, initial_data
-        
+
         # schedule first event 
-        self.pending.append( (instant, (src, dst, data )) )
-        
+        self.pending.append((instant, (src, dst, data)))
+
         # run the loop
         return self.__loop__()
 
     def __loop__(self):
-        
+
         # creating a sorted event list
         ordered_events = []
 
@@ -47,7 +48,7 @@ class FaultySimulator (DiscreteEventSimulator):
         while len(self.pending) > 0:
 
             # getting the event with lowest instant
-            event = min (self.pending, key = lambda e:e[0])
+            event = min(self.pending, key=lambda e: e[0])
 
             # unfolding event properties
             instant, src, dst, data = event[0], event[1][0], event[1][1], event[1][2]
@@ -57,16 +58,14 @@ class FaultySimulator (DiscreteEventSimulator):
 
             # removing event from the queue
             self.pending.remove(event)
-        
+
             # skipping event based on fault probability
             if random.random() < self.fault_chance:
-
                 # skipping iteration
                 continue
 
             # executing event if event is valid
             if (src, dst) in self.distances or src is None:
-
                 # appending event to sorted event list
                 ordered_events.append(event)
 
@@ -76,7 +75,7 @@ class FaultySimulator (DiscreteEventSimulator):
         # returning sorted event list
         return ordered_events
 
-    def __exec__ (self, event):
+    def __exec__(self, event):
 
         # unfolding event properties
         instant, src, dst, data = event[0], event[1][0], event[1][1], event[1][2]
@@ -89,7 +88,6 @@ class FaultySimulator (DiscreteEventSimulator):
 
         # generating events for each data
         for (new_dst, new_data, delay) in new_datas:
-
             # get distance to node
             distance = self.distances[(new_src, new_dst)]
 
