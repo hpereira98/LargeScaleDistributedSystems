@@ -45,7 +45,7 @@ class FaultySimulator(DiscreteEventSimulator):
         ordered_events = []
 
         # running loop
-        while len(self.pending) > 0:  # and self.current_instant <= 1000:  # 1000ms maximum
+        while len(self.pending) > 0 and self.current_instant <= 10000:  # 1000ms maximum
 
             # getting the event with lowest instant
             event = min(self.pending, key=lambda e: e[0])
@@ -68,7 +68,7 @@ class FaultySimulator(DiscreteEventSimulator):
                 # continue
 
             # executing event if event is valid
-            if (src, dst) in self.distances or (dst, src) in self.distances or src is None:
+            if (src, dst) in self.distances or (dst, src) in self.distances or src == dst or src is None:
                 # appending event to sorted event list
                 ordered_events.append(event)
 

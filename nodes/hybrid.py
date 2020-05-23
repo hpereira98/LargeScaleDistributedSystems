@@ -1,3 +1,5 @@
+import random
+
 from .node import Node
 
 from enum import Enum
@@ -8,10 +10,11 @@ class HybridNode(Node):
     # - id: identification number 
     # - role: node role in the network
     # - neighbors: adjacent nodes id's
-    def __init__(self, id, role, distances, fanout, initial_value):
+    def __init__(self, id, role, distances, initial_value, fanout, timeout):
 
         self.id = id
         self.role = role
+        self.timeout = timeout
 
         # aggregation info
         self.sum = initial_value
@@ -22,6 +25,8 @@ class HybridNode(Node):
         self.message_id = 0
         # dictionary for received messages in some round
         self.received = {}
+        # dictionary for ihave messages
+        self.identifiers = {}
 
         # setting neighbors
         self.neighbors = []
@@ -31,16 +36,8 @@ class HybridNode(Node):
             elif dst == self.id:
                 self.neighbors.append(src)
 
-        # setting eager and lazy neighbors
-        fan = 1
-        self.eager = []
-        self.lazy = []
-        for neighbor in self.neighbors:
-            if fan <= fanout:
-                self.eager.append(neighbor)
-            else:
-                self.lazy.append(neighbor)
-            fan += 1
+        num_neighbors = len(self.neighbors)
+        self.fanout = fanout if fanout <= num_neighbors else num_neighbors
 
     # invoked from simulator
     def handle(self, src, data):
@@ -61,9 +58,13 @@ class HybridNode(Node):
 
             return self.__ask__(src, id)
 
+        elif type is MessageType.ACK:
+
+            return self.__ack__(src, id)
+
         elif type is MessageType.PERIODIC:
 
-            return self.__periodic__(src, id)
+            return self.__periodic__(src, id, payload)
 
         elif type is MessageType.GC:
 
@@ -78,28 +79,53 @@ class HybridNode(Node):
 
         res = []
 
-        self.sum /= len(self.eager) + 1
-        self.weight /= len(self.eager) + 1
+        self.sum /= self.fanout + 1
+        self.weight /= self.fanout + 1
 
-        for node in self.eager:
-            res.append((node, (MessageType.GOSSIP, self.message_id, (GossipType.REQUEST, self.sum, self.weight)), 0))
+        random.shuffle(self.neighbors)
 
-        for node in self.lazy:
-            res.append((node, (MessageType.IHAVE, self.message_id, ""), 0))
+        fan = 1
+        for neighbor in self.neighbors:
+            if fan <= self.fanout:
+                res.append((neighbor, (MessageType.GOSSIP, self.message_id, (GossipType.REQUEST, self.sum, self.weight)), 0))
+            else:
+                res.append((neighbor, (MessageType.IHAVE, self.message_id, ""), 0))
 
-        self.message_id += 1
+            fan += 1
 
         return res
 
     # send a message to one node
-    def __cast__(self, dst, message_id):
+    def __cast__(self, dst, message_id, type):
 
         res = []
 
         self.sum /= 2
         self.weight /= 2
 
-        res.append((dst, (MessageType.GOSSIP, message_id, (GossipType.RESPONSE, self.sum, self.weight)), 0))
+        res.append((dst, (MessageType.GOSSIP, message_id, (type, self.sum, self.weight)), 0))
+
+        return res
+
+    def __increment_round__(self):
+
+        res = []
+
+        # multicast only when there isn't previous round and the current round isn't in the map
+        # or the previous round has finished
+        if self.message_id not in self.received or (len(self.received[self.message_id]) == len(self.neighbors)):
+
+            # send an ack to every node that sent me an ihave with an id == self.message_id
+            if self.message_id in self.identifiers:
+                for node in self.identifiers[self.message_id]:
+                    res.append((node, (MessageType.ACK, self.message_id, ''), 0))
+
+            # increment current round
+            self.message_id += 1
+            self.received[self.message_id] = []
+            res = res + self.__multicast__()
+
+        self.aggregate = round(self.sum / self.weight, 3)
 
         return res
 
@@ -115,51 +141,64 @@ class HybridNode(Node):
         # case i'm the initial node
         if src is None:
             self.weight = 1
-            # print(str(self.id) + '(begin): \tsum: ' + str(round(self.sum, 5)) + ' \tweight: ' + str(round(self.weight, 5)) + ' \taggregate: ' + str(self.aggregate))
 
         else:
-            # print(str(self.id) + '(begin): \tsum: ' + str(round(self.sum, 5)) + ' \tweight: ' + str(round(self.weight, 5)) + ' \taggregate: ' + str(self.aggregate))
             if type is GossipType.REQUEST:
-                res = res + self.__cast__(src, id)
+                res = res + self.__cast__(src, id, GossipType.RESPONSE)
+
             else:
                 self.received[id].append(src)
 
             self.sum += sum
             self.weight += weight
 
-        # multicast only when there isn't previous round and the current round isn't in the map
-        # or the previous round has finished
-        if ((self.message_id - 1) not in self.received and self.message_id not in self.received) or (
-                len(self.received[self.message_id - 1]) == len(self.neighbors)):
-            self.received[self.message_id] = []
-            res = res + self.__multicast__()
-
-        # print('send: ' + str(res))
-
-        self.aggregate = round(self.sum / self.weight, 3)
-        # print(str(self.id) + '(end): \tsum: ' + str(round(self.sum, 5)) + ' \tweight: ' + str(round(self.weight, 5)) + ' \taggregate: ' + str(self.aggregate))
-
-        return res
+        return res + self.__increment_round__()
 
     # invoked when received a ihave message
     def __ihave__(self, src, id):
 
-        return []
+        res = []
+
+        # if the received round is greater than mine
+        if id > self.message_id:
+            if id not in self.identifiers:
+                self.identifiers[id] = []
+
+            self.identifiers[id].append(src)
+
+            res.append((self.id, (MessageType.PERIODIC, id, src), self.timeout))
+
+        else:
+            res.append((src, (MessageType.ACK, id, ''), 0))
+
+        return res
 
     # invoked when received an ack message
     def __ack__(self, src, id):
 
-        return []
+        self.received[id].append(src)
+
+        return self.__increment_round__()
 
     # invoked when received an ask message
     def __ask__(self, src, id):
 
-        return []
+        return self.__cast__(src, id, GossipType.REQUEST)
 
     # invoked when received a periodic message
-    def __periodic__(self, src, id):
+    def __periodic__(self, src, id, dst):
 
-        return []
+        res = []
+
+        # if the received round is still greater than mine
+        if id > self.message_id and id in self.identifiers:
+            self.identifiers[id].remove(dst)
+            res.append((dst, (MessageType.ASK, id, ''), 0))
+
+        else:
+            res.append((dst, (MessageType.ACK, id, ''), 0))
+
+        return res
 
     # invoked when received a garbageCollection message
     def __gc__(self, src):
