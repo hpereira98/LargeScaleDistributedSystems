@@ -4,18 +4,20 @@ from .node import Node
 
 from enum import Enum
 
+from time import perf_counter
+
 
 class HybridNode(Node):
 
     # - id: identification number 
     # - role: node role in the network
     # - neighbors: adjacent nodes id's
-    def __init__(self, id, role, distances, initial_value, fanout, timeout):
+    def __init__(self, id, role, distances, initial_value, fanout, ihave_timeout):
 
         self.id = id
         self.role = role
-        self.timeout = timeout
-
+        self.ihave_timeout = ihave_timeout
+        
         # aggregation info
         self.sum = initial_value
         self.weight = 0
@@ -38,6 +40,16 @@ class HybridNode(Node):
 
         num_neighbors = len(self.neighbors)
         self.fanout = fanout if fanout <= num_neighbors else num_neighbors
+
+        # Fault detection timeouts (based on TCP)
+        self.rto = {neighbor:1000 for neighbor in self.neighbors} # Initial Retransmission Timeout (in miliseconds)
+        self.srtt = {neighbor:-1 for neighbor in self.neighbors} # Smoothed Round-trip Time (-1 as it has no initial value)
+        self.rttvar = {neighbor:-1 for neighbor in self.neighbors} # Variation in Round-trip time (-1 as it has no initial value)
+
+        self.min_rto = 20 # Minimum Retransmission Timeout
+
+        # Timers to calculate RTT
+        self.timers = dict()
 
     # invoked from simulator
     def handle(self, src, data):
@@ -87,6 +99,8 @@ class HybridNode(Node):
         fan = 1
         for neighbor in self.neighbors:
             if fan <= self.fanout:
+                # Starting timer when sending a GOSSIP_REQUEST
+                self.timers[neighbor] = perf_counter()
                 res.append((neighbor, (MessageType.GOSSIP, self.message_id, (GossipType.REQUEST, self.sum, self.weight)), 0))
             else:
                 res.append((neighbor, (MessageType.IHAVE, self.message_id, ""), 0))
@@ -102,6 +116,10 @@ class HybridNode(Node):
 
         self.sum /= 2
         self.weight /= 2
+
+        # Starting timer when sending a GOSSIP_REQUEST
+        if type is GossipType.REQUEST:
+            self.timers[dst] = perf_counter()
 
         res.append((dst, (MessageType.GOSSIP, message_id, (type, self.sum, self.weight)), 0))
 
@@ -123,6 +141,7 @@ class HybridNode(Node):
             # increment current round
             self.message_id += 1
             self.received[self.message_id] = []
+            #self.timers = dict()
             res = res + self.__multicast__()
 
         self.aggregate = round(self.sum / self.weight, 3)
@@ -147,6 +166,25 @@ class HybridNode(Node):
                 res = res + self.__cast__(src, id, GossipType.RESPONSE)
 
             else:
+
+                # Calculating Round-trip Time with node
+                rtt = perf_counter() - self.timers[src]
+
+                # Updating RTO parameters
+                if self.srtt[src] == -1 : # First RTO calculation for node
+
+                    self.srtt[src] = rtt
+                    self.rttvar[src] = rtt * 0.5
+                
+                else:
+
+                    self.rttvar[src] = 0.75 * self.rttvar[src] + 0.25 * abs (self.srtt[src] - rtt)
+                    self.srtt[src] = 0.875 * self.srtt[src] + 0.125 * rtt
+
+
+                # Updating Retransmission Timeout
+                self.rto[src] = self.srtt[src] + max( self.min_rto, 4 * self.rttvar[src] )
+
                 self.received[id].append(src)
 
             self.sum += sum
@@ -166,7 +204,7 @@ class HybridNode(Node):
 
             self.identifiers[id].append(src)
 
-            res.append((self.id, (MessageType.PERIODIC, id, src), self.timeout))
+            res.append((self.id, (MessageType.PERIODIC, id, src), self.ihave_timeout))
 
         else:
             res.append((src, (MessageType.ACK, id, ''), 0))
