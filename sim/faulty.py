@@ -45,7 +45,7 @@ class FaultySimulator(DiscreteEventSimulator):
         ordered_events = []
 
         # running loop
-        while len(self.pending) > 0 and self.current_instant <= 10000:  # 1000ms maximum
+        while len(self.pending) > 0 and self.current_instant <= 1000:  # 1000ms maximum
 
             # getting the event with lowest instant
             event = min(self.pending, key=lambda e: e[0])
@@ -57,13 +57,13 @@ class FaultySimulator(DiscreteEventSimulator):
             self.current_instant = instant
 
             # printing event
-            # print(str(instant) + "s :: " + str(src) + " -> " + str(dst) + " :: " + str(data))
+            print(str(instant) + "s :: " + str(src) + " -> " + str(dst) + " :: " + str(data))
 
             # removing event from the queue
             self.pending.remove(event)
 
             # skipping event based on fault probability
-            # if src != dst and random.random() < self.fault_chance:
+            # if src != dst and random.random() < self.fault_chance and :
                 # skipping iteration
                 # continue
 

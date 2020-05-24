@@ -12,11 +12,10 @@ class HybridNode(Node):
     # - id: identification number 
     # - role: node role in the network
     # - neighbors: adjacent nodes id's
-    def __init__(self, id, role, distances, initial_value, fanout, ihave_timeout):
+    def __init__(self, id, role, distances, initial_value, fanout):
 
         self.id = id
         self.role = role
-        self.ihave_timeout = ihave_timeout
         
         # aggregation info
         self.sum = initial_value
@@ -27,8 +26,6 @@ class HybridNode(Node):
         self.message_id = 0
         # dictionary for received messages in some round
         self.received = {}
-        # dictionary for ihave messages
-        self.identifiers = {}
 
         # setting neighbors
         self.neighbors = []
@@ -41,15 +38,16 @@ class HybridNode(Node):
         num_neighbors = len(self.neighbors)
         self.fanout = fanout if fanout <= num_neighbors else num_neighbors
 
-        # Fault detection timeouts (based on TCP)
-        self.rto = {neighbor:1000 for neighbor in self.neighbors} # Initial Retransmission Timeout (in miliseconds)
+        # Fault detection parameters (based on TCP)
+        self.rto = {neighbor:100 for neighbor in self.neighbors} # Initial Retransmission Timeout (in miliseconds)
         self.srtt = {neighbor:-1 for neighbor in self.neighbors} # Smoothed Round-trip Time (-1 as it has no initial value)
         self.rttvar = {neighbor:-1 for neighbor in self.neighbors} # Variation in Round-trip time (-1 as it has no initial value)
 
         self.min_rto = 20 # Minimum Retransmission Timeout
+        self.max_rto = 2000 # Maxixmum Retransmission Timeout
 
         # Timers to calculate RTT
-        self.timers = dict()
+        self.timers = {neighbor:-1 for neighbor in self.neighbors} # Timers for RTT
 
     # invoked from simulator
     def handle(self, src, data):
@@ -62,21 +60,9 @@ class HybridNode(Node):
 
             return self.__gossip__(src, id, payload)
 
-        elif type is MessageType.IHAVE:
+        elif type is MessageType.RETRANSMISSION:
 
-            return self.__ihave__(src, id)
-
-        elif type is MessageType.ASK:
-
-            return self.__ask__(src, id)
-
-        elif type is MessageType.ACK:
-
-            return self.__ack__(src, id)
-
-        elif type is MessageType.PERIODIC:
-
-            return self.__periodic__(src, id, payload)
+            return self.__retransmission__(src, id, payload)
 
         elif type is MessageType.GC:
 
@@ -85,6 +71,36 @@ class HybridNode(Node):
         else:
 
             return []
+
+    def __send__ (self, event):
+
+        # Adding event to the events to send to simulator
+        res = [event] 
+
+        # Creating retransmission event
+        retransmission_event = (self.id, (MessageType.RETRANSMISSION, self.message_id, event), self.rto)
+
+        # Adding retransmission event to events to return to simulator
+        # res.append(retransmission_event)
+
+        return res
+
+
+    def __retransmission__ (self, id, data):
+
+        # Destination of original message
+        dst = data[0]
+
+        # If timer was reset, then a response was received for the message
+        if self.timers[dst] == -1 :
+            
+            return []
+
+        # Doubling RTO
+        self.rto[dst] = min (self.rto[dst] * 2, self.max_rto)
+
+        # Re-sending message
+        return self.__send__(data)
 
     # multicast pair to neighbors
     def __multicast__(self):
@@ -98,12 +114,14 @@ class HybridNode(Node):
 
         fan = 1
         for neighbor in self.neighbors:
+            
             if fan <= self.fanout:
+                
                 # Starting timer when sending a GOSSIP_REQUEST
-                self.timers[neighbor] = perf_counter()
-                res.append((neighbor, (MessageType.GOSSIP, self.message_id, (GossipType.REQUEST, self.sum, self.weight)), 0))
-            else:
-                res.append((neighbor, (MessageType.IHAVE, self.message_id, ""), 0))
+                self.timers[neighbor] = perf_counter() * 0.0001
+
+                # Sending 
+                res += self.__send__((neighbor, (MessageType.GOSSIP, self.message_id, (GossipType.REQUEST, self.sum, self.weight)), 0))
 
             fan += 1
 
@@ -112,36 +130,24 @@ class HybridNode(Node):
     # send a message to one node
     def __cast__(self, dst, message_id, type):
 
-        res = []
-
         self.sum /= 2
         self.weight /= 2
 
-        # Starting timer when sending a GOSSIP_REQUEST
-        if type is GossipType.REQUEST:
-            self.timers[dst] = perf_counter()
+        return self.__send__((dst, (MessageType.GOSSIP, message_id, (GossipType.RESPONSE, self.sum, self.weight)), 0))
 
-        res.append((dst, (MessageType.GOSSIP, message_id, (type, self.sum, self.weight)), 0))
-
-        return res
-
+    # checks if all neighbours have responded in this round and if such increments it
     def __increment_round__(self):
 
         res = []
 
         # multicast only when there isn't previous round and the current round isn't in the map
         # or the previous round has finished
-        if self.message_id not in self.received or (len(self.received[self.message_id]) == len(self.neighbors)):
-
-            # send an ack to every node that sent me an ihave with an id == self.message_id
-            if self.message_id in self.identifiers:
-                for node in self.identifiers[self.message_id]:
-                    res.append((node, (MessageType.ACK, self.message_id, ''), 0))
+        if self.message_id not in self.received or (len(self.received[self.message_id]) == self.fanout):
 
             # increment current round
             self.message_id += 1
             self.received[self.message_id] = []
-            #self.timers = dict()
+
             res = res + self.__multicast__()
 
         self.aggregate = round(self.sum / self.weight, 3)
@@ -162,13 +168,18 @@ class HybridNode(Node):
             self.weight = 1
 
         else:
+            
             if type is GossipType.REQUEST:
+                
                 res = res + self.__cast__(src, id, GossipType.RESPONSE)
 
             else:
 
                 # Calculating Round-trip Time with node
-                rtt = perf_counter() - self.timers[src]
+                rtt = perf_counter() * 0.0001 - self.timers[src]
+
+                # Resetting timer
+                self.timers[src] = -1
 
                 # Updating RTO parameters
                 if self.srtt[src] == -1 : # First RTO calculation for node
@@ -185,6 +196,7 @@ class HybridNode(Node):
                 # Updating Retransmission Timeout
                 self.rto[src] = self.srtt[src] + max( self.min_rto, 4 * self.rttvar[src] )
 
+                # Appending src to messages received in this round
                 self.received[id].append(src)
 
             self.sum += sum
@@ -192,66 +204,13 @@ class HybridNode(Node):
 
         return res + self.__increment_round__()
 
-    # invoked when received a ihave message
-    def __ihave__(self, src, id):
-
-        res = []
-
-        # if the received round is greater than mine
-        if id > self.message_id:
-            if id not in self.identifiers:
-                self.identifiers[id] = []
-
-            self.identifiers[id].append(src)
-
-            res.append((self.id, (MessageType.PERIODIC, id, src), self.ihave_timeout))
-
-        else:
-            res.append((src, (MessageType.ACK, id, ''), 0))
-
-        return res
-
-    # invoked when received an ack message
-    def __ack__(self, src, id):
-
-        self.received[id].append(src)
-
-        return self.__increment_round__()
-
-    # invoked when received an ask message
-    def __ask__(self, src, id):
-
-        return self.__cast__(src, id, GossipType.REQUEST)
-
-    # invoked when received a periodic message
-    def __periodic__(self, src, id, dst):
-
-        res = []
-
-        # if the received round is still greater than mine
-        if id > self.message_id and id in self.identifiers:
-            self.identifiers[id].remove(dst)
-            res.append((dst, (MessageType.ASK, id, ''), 0))
-
-        else:
-            res.append((dst, (MessageType.ACK, id, ''), 0))
-
-        return res
-
-    # invoked when received a garbageCollection message
-    def __gc__(self, src):
-
-        return []
 
 
 # different types of messages recognized by this type of node
 class MessageType(Enum):
-    GOSSIP = 1
-    IHAVE = 2
-    ASK = 3
-    PERIODIC = 4
-    GC = 5
-    ACK = 6
+    GOSSIP = 1    
+    RETRANSMISSION = 2
+
 
 
 class GossipType(Enum):
