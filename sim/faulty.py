@@ -8,7 +8,7 @@ class FaultySimulator(DiscreteEventSimulator):
     # - nodes: graph nodes
     # - distances: distances between each node 
     # - fault_chance: probability of losing a message in simulation
-    def __init__(self, nodes, distances, fault_chance=0):
+    def __init__(self, nodes, distances, fault_chance=0, simulation_time=1000):
 
         # nodes
         self.nodes = nodes
@@ -25,6 +25,9 @@ class FaultySimulator(DiscreteEventSimulator):
         # probability of losing an event
         self.fault_chance = fault_chance
 
+        # simulation max time
+        self.simulation_time = simulation_time
+
     def start(self, initial_data, initial_node):
 
         # starting randomizer
@@ -39,13 +42,19 @@ class FaultySimulator(DiscreteEventSimulator):
         # run the loop
         return self.__loop__()
 
+    def proceed (self, additional_simulation_time):
+
+        self.simulation_time += additional_simulation_time
+
+        return self.__loop__()
+
     def __loop__(self):
 
         # creating a sorted event list
         ordered_events = []
 
         # running loop
-        while len(self.pending) > 0 and self.current_instant <= 1000:  # 1000ms maximum
+        while len(self.pending) > 0 and self.current_instant <= self.simulation_time:  # 1000ms maximum
 
             # getting the event with lowest instant
             event = min(self.pending, key=lambda e: e[0])
@@ -56,16 +65,19 @@ class FaultySimulator(DiscreteEventSimulator):
             # simulator time
             self.current_instant = instant
 
-            # printing event
-            print(str(instant) + "s :: " + str(src) + " -> " + str(dst) + " :: " + str(data))
-
             # removing event from the queue
             self.pending.remove(event)
 
             # skipping event based on fault probability
-            # if src != dst and random.random() < self.fault_chance and :
+            if src != dst and random.random() < self.fault_chance and src is not None:
+
+                print("\n[ ] {:.3f}".format(instant) + "s :: " + str(src) + " -> " + str(dst) + " :: " + str(data), end="")
+                
                 # skipping iteration
-                # continue
+                continue
+
+            else:
+                 print(("\n" if src is not None else "" )+ "[X] {:.3f}".format(instant) + "s :: " + str(src) + " -> " + str(dst) + " :: " + str(data), end="")
 
             # executing event if event is valid
             if (src, dst) in self.distances or (dst, src) in self.distances or src == dst or src is None:
@@ -84,7 +96,7 @@ class FaultySimulator(DiscreteEventSimulator):
         instant, src, dst, data = event[0], event[1][0], event[1][1], event[1][2]
 
         # node handling event and generating new datas
-        new_datas = self.nodes[dst].handle(src, data)
+        new_datas = self.nodes[dst].handle(src, data, self.current_instant)
 
         # update src node
         new_src = dst

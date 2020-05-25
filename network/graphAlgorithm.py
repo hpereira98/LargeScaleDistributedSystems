@@ -7,13 +7,13 @@ from random import randrange
 def erdosRenyi(num_vertices):
     graph = nx.Graph()
     for x in range(num_vertices):
-        graph.add_node(x)
+        graph.add_node("(" + str(x) + ")")
 
     while not nx.is_connected(graph):
         i = randrange(num_vertices)
         j = randrange(num_vertices)
         if i != j:
-            graph.add_edge(i, j)
+            graph.add_edge("(" + str(i) + ")", "(" + str(j) + ")")
 
     return graph
 
