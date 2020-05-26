@@ -1,5 +1,6 @@
 import random
 
+from .boundedqueue import BoundedQueue
 from .node import Node
 
 from enum import Enum
@@ -58,6 +59,9 @@ class PushSumNode(Node):
 
         # Timers to calculate RTT
         self.timers = {}  # Timers for RTT
+
+        # Termination info
+        self.nonews = BoundedQueue(3)
 
     # invoked from simulator
     def handle(self, src, data, instant):
