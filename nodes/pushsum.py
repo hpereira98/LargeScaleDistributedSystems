@@ -11,7 +11,7 @@ class PushSumNode(Node):
     # - id: identification number 
     # - role: node role in the network
     # - neighbors: adjacent nodes id's
-    def __init__(self, id, distances, initial_value, fanout):
+    def __init__(self, id, distances, initial_value, fanout, nonews):
 
         # node id
         self.id = id
@@ -61,7 +61,7 @@ class PushSumNode(Node):
         self.timers = {}  # Timers for RTT
 
         # Termination info
-        self.nonews = BoundedQueue(3)
+        self.no_news = BoundedQueue(nonews)
 
     # invoked from simulator
     def handle(self, src, data, instant):
@@ -217,18 +217,19 @@ class PushSumNode(Node):
 
         res = []
 
+        self.aggregate = round(self.sum / self.weight, 3)
+
         # multicast only when there isn't previous round and the current round isn't in the map
         # or the previous round has finished
-        if self.round not in self.responded or (len(self.responded[self.round]) == self.fanout):
+        if (self.round not in self.responded or (len(self.responded[self.round]) == self.fanout)) and not self.no_news.compare(self.aggregate):
+
             # increment current round
             self.round += 1
             self.responded[self.round] = []
 
             res += self.__multi_request__()
 
-        self.aggregate = round(self.sum / self.weight, 3)
-
-        # print (" :: Aggregate: {}".format(self.aggregate), end="")
+        self.no_news.add(self.aggregate)
 
         return res
 
