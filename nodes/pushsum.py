@@ -4,18 +4,15 @@ from .node import Node
 
 from enum import Enum
 
-from time import perf_counter
-
-
-class HybridNode(Node):
+class PushSumNode(Node):
 
     # - id: identification number 
     # - role: node role in the network
     # - neighbors: adjacent nodes id's
-    def __init__(self, id, role, distances, initial_value, fanout):
+    def __init__(self, id, distances, initial_value, fanout):
 
+        # node id
         self.id = id
-        self.role = role
         
         # unique message ids
         self.message_id = -1
@@ -89,149 +86,6 @@ class HybridNode(Node):
 
             return []
 
-    def __id__ (self) :
-
-        # Incrementing ID
-        self.message_id += 1
-
-        return "[{},{}]".format(self.id, self.message_id)
-
-    # Transforms event into unique event
-    def __identify__ (self, event):
-
-        # Unpacking event
-        dst, data, delay = event
-        type, id, payload = data
-
-        # Creating unique ID for message
-        id = self.__id__()
-
-        return [dst, (type, id, payload), delay]
-
-    # Creates retransmission messages to make sure message is delivered
-    def __safe_send__ (self, event):
-        
-        # Adding event with unique subround number
-        res = [event]
-
-        # Waiting for aknowledgment of message
-        self.timers[event[1][1]] = self.current_instant
-
-        # Creating retransmission event
-        retransmission_event = self.__identify__((self.id, (MessageType.RETRANSMISSION, -1, event), self.rto[event[0]]))
-
-        # Adding retransmission event to events to return to simulator
-        res += [retransmission_event]
-
-        return res
-
-    def __retransmission__ (self, event):
-
-         # Unpacking event
-        dst, data, delay = event
-        type, id, payload = data
-
-        # If timer was reset, then a response was received for the message
-        if id not in self.timers:
-            
-            #print(" :: Not resending!", end="")
-            return []
-
-        #print(" :: Resending!", end="")
-
-        # Doubling RTO
-        self.rto[dst] = min (self.rto[dst] * 2, self.max_rto)
-
-        # Re-sending message
-        return self.__safe_send__(event)
-
-    
-    def __ack__ (self, src, id):
-
-        # Calculating Round-trip Time with node
-        rtt = self.current_instant - self.timers[id]
-
-        # Resetting timer
-        del self.timers[id]
-
-        # Updating RTO parameters
-        if self.srtt[src] == -1 : # First RTO calculation for node
-
-            self.srtt[src] = rtt
-            self.rttvar[src] = rtt * 0.5
-        
-        else:
-
-            self.rttvar[src] = 0.75 * self.rttvar[src] + 0.25 * abs (self.srtt[src] - rtt)
-            self.srtt[src] = 0.875 * self.srtt[src] + 0.125 * rtt
-
-
-        # Updating Retransmission Timeout
-        self.rto[src] = self.srtt[src] + max( self.min_rto, 4 * self.rttvar[src] )
-
-        #print(" :: New RTO with {}: {}".format(src, self.rto[src]), end="")
-
-        return []
-
-
-    # multicast pair to neighbors
-    def __multi_request__(self):
-
-        res = []
-
-        self.sum /= self.fanout + 1
-        self.weight /= self.fanout + 1
-
-        random.shuffle(self.neighbors)
-
-        fan = 1
-        for neighbor in self.neighbors:
-            
-            if fan <= self.fanout:
-                
-                # Gossip Request event
-                event = self.__identify__((neighbor, (MessageType.GOSSIP, -1, (GossipType.REQUEST, self.round, self.sum, self.weight)), 0))
-
-                # Sending 
-                res += self.__safe_send__(event)
-
-            fan += 1
-
-        return res
-
-    # send a message to one node
-    def __respond__(self, dst, round):
-
-        self.sum /= 2
-        self.weight /= 2
-
-        event = self.__identify__((dst, (MessageType.GOSSIP, -1, (GossipType.RESPONSE, round, self.sum, self.weight)), 0))
-
-        return self.__safe_send__(event)
-
-    # checks if all neighbours have responded in this round and if such increments it
-    def __increment_round__(self):
-
-        res = []
-
-        # multicast only when there isn't previous round and the current round isn't in the map
-        # or the previous round has finished
-        if self.round not in self.responded or (len(self.responded[self.round]) == self.fanout):
-
-            #print(" :: Incremented round!", end="")
-
-            # increment current round
-            self.round += 1
-            self.responded[self.round] = []
-
-            res += self.__multi_request__()
-
-        self.aggregate = round(self.sum / self.weight, 3)
-
-        # print (" :: Aggregate: {}".format(self.aggregate), end="")
-
-        return res
-
     # invoked when received a gossip message
     def __gossip__(self, src, id, payload):
 
@@ -287,7 +141,7 @@ class HybridNode(Node):
                 res.append( (src, (MessageType.ACK, id, []) , 0) )
 
             elif type is GossipType.RESPONSE:
-
+                
                 # Appending ACK
                 res.append( (src, (MessageType.ACK, id, []) , 0) )
 
@@ -295,7 +149,144 @@ class HybridNode(Node):
 
         return res + self.__increment_round__()
 
+    def __retransmission__ (self, event):
 
+         # Unpacking event
+        dst, data, delay = event
+        type, id, payload = data
+
+        # If timer was reset, then a response was received for the message
+        if id not in self.timers:
+            
+            #print(" :: Not resending!", end="")
+            return []
+
+        #print(" :: Resending!", end="")
+
+        # Doubling RTO
+        self.rto[dst] = min (self.rto[dst] * 2, self.max_rto)
+
+        # Re-sending message
+        return self.__safe_send__(event)
+      
+    def __ack__ (self, src, id):
+
+        # Calculating Round-trip Time with node
+        rtt = self.current_instant - self.timers[id]
+
+        # Resetting timer
+        del self.timers[id]
+
+        # Updating RTO parameters
+        if self.srtt[src] == -1 : # First RTO calculation for node
+
+            self.srtt[src] = rtt
+            self.rttvar[src] = rtt * 0.5
+        
+        else:
+
+            self.rttvar[src] = 0.75 * self.rttvar[src] + 0.25 * abs (self.srtt[src] - rtt)
+            self.srtt[src] = 0.875 * self.srtt[src] + 0.125 * rtt
+
+        
+        # Updating Retransmission Timeout
+        self.rto[src] = self.srtt[src] + max( self.min_rto, 4 * self.rttvar[src] )
+
+        print(" :: New RTO with {}: {}".format(src, self.rto[src]), end="")
+
+        return []
+
+     # send a message to one node
+    def __respond__(self, dst, round):
+
+        self.sum /= 2
+        self.weight /= 2
+
+        event = self.__identify__((dst, (MessageType.GOSSIP, -1, (GossipType.RESPONSE, round, self.sum, self.weight)), 0))
+
+        return self.__safe_send__(event)
+
+    # checks if all neighbours have responded in this round and if such increments it
+    def __increment_round__(self):
+
+        res = []
+
+        # multicast only when there isn't previous round and the current round isn't in the map
+        # or the previous round has finished
+        if self.round not in self.responded or (len(self.responded[self.round]) == self.fanout):
+
+            # increment current round
+            self.round += 1
+            self.responded[self.round] = []
+
+            res += self.__multi_request__()
+
+        self.aggregate = round(self.sum / self.weight, 3)
+
+        # print (" :: Aggregate: {}".format(self.aggregate), end="")
+
+        return res
+
+    # multicast pair to neighbors
+    def __multi_request__(self):
+
+        res = []
+
+        self.sum /= self.fanout + 1
+        self.weight /= self.fanout + 1
+
+        random.shuffle(self.neighbors)
+
+        fan = 1
+        for neighbor in self.neighbors:
+            
+            if fan <= self.fanout:
+                
+                # Gossip Request event
+                event = self.__identify__((neighbor, (MessageType.GOSSIP, -1, (GossipType.REQUEST, self.round, self.sum, self.weight)), 0))
+
+                # Sending 
+                res += self.__safe_send__(event)
+
+            fan += 1
+
+        return res
+
+    # Creates retransmission messages to make sure message is delivered
+    def __safe_send__ (self, event):
+        
+        # Adding event with unique subround number
+        res = [event]
+
+        # Waiting for aknowledgment of message
+        self.timers[event[1][1]] = self.current_instant
+
+        # Creating retransmission event
+        retransmission_event = self.__identify__((self.id, (MessageType.RETRANSMISSION, -1, event), self.rto[event[0]]))
+
+        # Adding retransmission event to events to return to simulator
+        res += [retransmission_event]
+
+        return res
+
+    def __id__ (self) :
+
+        # Incrementing ID
+        self.message_id += 1
+
+        return "[{},{}]".format(self.id, self.message_id)
+
+    # Transforms event into unique event
+    def __identify__ (self, event):
+
+        # Unpacking event
+        dst, data, delay = event
+        type, id, payload = data
+
+        # Creating unique ID for message
+        id = self.__id__()
+
+        return [dst, (type, id, payload), delay]
 
 # different types of messages recognized by this type of node
 class MessageType(Enum):
@@ -305,14 +296,6 @@ class MessageType(Enum):
     GC = 4
 
 
-
 class GossipType(Enum):
     REQUEST = 1
     RESPONSE = 2
-    THANKS = 3
-
-
-# different types of hybrid node
-class HybridRole(Enum):
-    PRIMARY = 1
-    SECUNDARY = 2
