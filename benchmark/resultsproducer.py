@@ -51,21 +51,30 @@ def produce_results(graph_type, initial_value, fanout, no_news, error_percentage
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
 
+        durations = {}
+        messages = {}
         workers = []
+
         i = 2
         while i <= max_bound:
+            durations[i] = []
+            messages[i] = []
+
             for _ in range(times):
                 workers.append(executor.submit(run, graph_type, i, initial_value, fanout, no_news, error_percentage))
+
             i *= 2
 
-        # append all the execution results to a list
-        results = []
+        # append all the execution results to the respective dictionaries
         for worker in concurrent.futures.as_completed(workers):
-            results.append(worker.result())
-            print(worker.result())
+            vertices, duration, message_count = worker.result()
+            durations[vertices].append(duration)
+            messages[vertices].append(message_count)
 
-        return results
+        return durations, messages
 
 
 if __name__ == '__main__':
-    produce_results(GraphType.BARABASI_ALBERT, 10, 3, 5, 0.1, 10, 32)
+    __durations, __messages = produce_results(GraphType.BARABASI_ALBERT, 10, 3, 5, 0.1, 10, 32)
+    print(__durations)
+    print(__messages)
