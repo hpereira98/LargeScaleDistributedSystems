@@ -42,7 +42,7 @@ class FaultySimulator(DiscreteEventSimulator):
         # run the loop
         return self.__loop__()
 
-    def proceed (self, additional_simulation_time):
+    def proceed(self, additional_simulation_time):
 
         self.simulation_time += additional_simulation_time
 
@@ -71,13 +71,13 @@ class FaultySimulator(DiscreteEventSimulator):
             # skipping event based on fault probability
             if src != dst and random.random() < self.fault_chance and src is not None:
 
-                print("\n[ ] {:.3f}".format(instant) + "s :: " + str(src) + " -> " + str(dst) + " :: " + str(data), end="")
-                
+                # print("\n[ ] {:.3f}".format(instant) + "s :: " + str(src) + " -> " + str(dst) + " :: " + str(data), end="")
+
                 # skipping iteration
                 continue
 
-            else:
-                 print(("\n" if src is not None else "" )+ "[X] {:.3f}".format(instant) + "s :: " + str(src) + " -> " + str(dst) + " :: " + str(data), end="")
+            # else:
+                # print(("\n" if src is not None else "" )+ "[X] {:.3f}".format(instant) + "s :: " + str(src) + " -> " + str(dst) + " :: " + str(data), end="")
 
             # executing event if event is valid
             if (src, dst) in self.distances or (dst, src) in self.distances or src == dst or src is None:
