@@ -1,1 +1,1 @@
-__all__ = ["resultsproducer"]
+__all__ = ["resultsproducer", "statisticsproducer"]

@@ -2,7 +2,7 @@ import concurrent.futures
 
 from network.graphtype import GraphType
 from nodes.pushsum import PushSumNode, MessageType, GossipType
-from network.graphAlgorithm import erdosRenyi, barabasiAlbert
+from network.graphAlgorithm import erdosRenyi, barabasiAlbert, randomGeometric, wattsStrogatz
 from sim.faulty import FaultySimulator
 
 
@@ -17,6 +17,15 @@ def create_topology(graph_type, vertices, initial_value, fanout, no_news):
     elif graph_type is GraphType.BARABASI_ALBERT:
 
         graph = barabasiAlbert(vertices)
+
+    elif graph_type is GraphType.RANDOM_GEOMETRIC:
+
+        graph = randomGeometric(vertices, 0.1)
+
+    elif graph_type is GraphType.WATTS_STROGATZ:
+
+        k = 10 if vertices > 10 else vertices
+        graph = wattsStrogatz(vertices, k, 0.05)
 
     nodes = {}
     distances = {}
@@ -49,7 +58,7 @@ def run(graph_type, vertices, initial_value, fanout, no_news, error_percentage):
 
 def produce_results(graph_type, initial_value, fanout, no_news, error_percentage, times=10, max_bound=252):
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
 
         durations = {}
         messages = {}
@@ -75,6 +84,6 @@ def produce_results(graph_type, initial_value, fanout, no_news, error_percentage
 
 
 if __name__ == '__main__':
-    __durations, __messages = produce_results(GraphType.BARABASI_ALBERT, 10, 3, 5, 0.1, 10, 32)
+    __durations, __messages = produce_results(GraphType.RANDOM_GEOMETRIC, 10, 3, 5, 0.1, 10, 32)
     print(__durations)
     print(__messages)
