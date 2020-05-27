@@ -35,16 +35,6 @@ def barabasiAlbert(num_vertices):
     return graph
 
 
-# create a connected component with Random Geometric algorithm
-def randomGeometric(num_vertices, radius):
-
-    graph = nx.random_geometric_graph(num_vertices, radius, dim=1)
-    while not nx.is_connected(graph):
-        graph = nx.random_geometric_graph(num_vertices, radius, dim=1)
-
-    return adapt_graph(graph)
-
-
 # create a connected component with Watts Strogatz algorithm
 def wattsStrogatz(num_vertices, nearest_neighbors, rewiring_probability):
 
@@ -68,7 +58,6 @@ def adapt_graph(g):
 if __name__ == "__main__":
     # G = erdosRenyi(100)
     # G = barabasiAlbert(100)
-    # G = randomGeometric(512, 0.05)
     G = wattsStrogatz(100, 10, 0.05)
     nx.draw(G, pos=nx.spring_layout(G))
     plt.show()

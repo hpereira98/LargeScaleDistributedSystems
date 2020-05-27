@@ -2,7 +2,7 @@ import concurrent.futures
 
 from network.graphtype import GraphType
 from nodes.pushsum import PushSumNode, MessageType, GossipType
-from network.graphAlgorithm import erdosRenyi, barabasiAlbert, randomGeometric, wattsStrogatz
+from network.graphAlgorithm import erdosRenyi, barabasiAlbert, wattsStrogatz
 from sim.faulty import FaultySimulator
 
 
@@ -17,10 +17,6 @@ def create_topology(graph_type, vertices, initial_value, fanout, no_news):
     elif graph_type is GraphType.BARABASI_ALBERT:
 
         graph = barabasiAlbert(vertices)
-
-    elif graph_type is GraphType.RANDOM_GEOMETRIC:
-
-        graph = randomGeometric(vertices, 0.1)
 
     elif graph_type is GraphType.WATTS_STROGATZ:
 
