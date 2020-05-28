@@ -1,1 +1,1 @@
-__all__ = ["graphAlgorithm"]
+__all__ = ["graphAlgorithm", "graphtype", "probabilities"]

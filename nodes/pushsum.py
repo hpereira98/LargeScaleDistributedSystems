@@ -197,7 +197,7 @@ class PushSumNode(Node):
         # Updating Retransmission Timeout
         self.rto[src] = self.srtt[src] + max(self.min_rto, 4 * self.rttvar[src])
 
-        print(" :: New RTO with {}: {}".format(src, self.rto[src]), end="")
+        # print(" :: New RTO with {}: {}".format(src, self.rto[src]), end="")
 
         return []
 
