@@ -4,8 +4,16 @@ from random import randrange
 from network.probabilities import calculate_probability, preferential_attachment
 
 
-# create a connected component with Erdos Renyi algorithm
 def erdosRenyi(num_vertices):
+    """ Create a connected component with Erdos Renyi algorithm
+
+    Arguments:
+        num_vertices {int} -- number of vertices for the graph
+
+    Returns:
+        [Graph] -- constructed graph
+    """
+
     graph = nx.Graph()
     for x in range(num_vertices):
         graph.add_node("(" + str(x) + ")")
@@ -19,8 +27,16 @@ def erdosRenyi(num_vertices):
     return graph
 
 
-# create a connected component with Barabasi Albert algorithm
 def barabasiAlbert(num_vertices):
+    """ Create a connected component with Barabasi Albert algorithm
+
+    Arguments:
+        num_vertices {int} -- number of vertices for the graph
+
+    Returns:
+        [Graph] -- constructed graph
+    """
+
     graph = nx.Graph()
     for x in range(num_vertices):
         graph.add_node("(" + str(x) + ")")
@@ -35,14 +51,30 @@ def barabasiAlbert(num_vertices):
     return graph
 
 
-# create a connected component with Watts Strogatz algorithm
 def wattsStrogatz(num_vertices, nearest_neighbors, rewiring_probability):
+    """ Create a connected component with Watts Strogatz algorithm
+
+    Arguments:
+        num_vertices {int} -- number of vertices for the graph
+        nearest_neighbors {int} -- each node is joined with its k nearest neighbors in a ring topology
+        rewiring_probability {float} -- the probability of rewiring each edge
+
+    Returns:
+        [Graph] -- constructed graph
+    """
 
     return adapt_graph(nx.connected_watts_strogatz_graph(num_vertices, nearest_neighbors, rewiring_probability, tries=100000))
 
 
-# Adapt a graph to a desired form
 def adapt_graph(g):
+    """ Adapt a graph to a desired form.
+
+    Arguments:
+        g {Graph} -- graph to be adapted
+
+    Returns:
+        [Graph] -- constructed graph
+    """
 
     graph = nx.Graph()
     for node in nx.nodes(g):

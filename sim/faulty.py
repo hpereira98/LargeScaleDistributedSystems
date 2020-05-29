@@ -4,31 +4,54 @@ import random
 
 
 class FaultySimulator(DiscreteEventSimulator):
+    """ An implementation of the DiscreteEventSimulator interface.
 
-    # - nodes: graph nodes
-    # - distances: distances between each node 
-    # - fault_chance: probability of losing a message in simulation
+    Arguments:
+        DiscreteEventSimulator {DiscreteEventSimulator} -- Interface to implement
+    """
+
     def __init__(self, nodes, distances, fault_chance=0, simulation_time=1000):
+        """ Constructor for FaultySimulator class.
 
-        # nodes
+        Arguments:
+            nodes {Node} -- graph nodes
+            distances {array of pairs} -- distances between each node 
+
+        Keyword Arguments:
+            fault_chance {int} -- probability of losing a message in simulation (default: {0})
+            simulation_time {int} -- time to run simulation in milliseconds (logical time incremented by the simulator) (default: {1000})
+
+        Instantiated Attributes:
+            nodes {Node} -- graph nodes
+            current_instant -- simulator current instant tracker, based on the time of events
+            distances {array of pairs} -- distances between each node 
+            pending {array of events} -- contains all the events to handle (i.e. [(instant, (src, dst, data))])
+            fault_chance {int} -- probability of losing a message in simulation (default: {0})
+            simulation_time {int} -- time to run simulation in milliseconds (current_instant incremented by the simulator) (default: {1000})
+        """
+
         self.nodes = nodes
 
-        # distances between nodes
         self.distances = distances
 
-        # simulator current instant tracker
         self.current_instant = 0
 
-        # events pending execution [(instant, (src, dst, data))]
         self.pending = []
 
-        # probability of losing an event
         self.fault_chance = fault_chance
 
-        # simulation max time
         self.simulation_time = simulation_time
 
     def start(self, initial_data, initial_node):
+        """ Starts the simulation, introducing the first event in the simulation, then starts the loop.
+
+        Arguments:
+            initial_data {string} -- Content of the first event
+            initial_node {string} -- Destination of the first event in the simulation
+
+        Returns:
+            [array of events] -- events that the loop generated
+        """
 
         # starting randomizer
         random.seed()
@@ -43,12 +66,25 @@ class FaultySimulator(DiscreteEventSimulator):
         return self.__loop__()
 
     def proceed(self, additional_simulation_time):
+        """ Continue simulation for an additional time.
+
+        Arguments:
+            additional_simulation_time {int} -- additional time for simulation
+
+        Returns:
+            [array of events] -- events that the loop generated
+        """
 
         self.simulation_time += additional_simulation_time
 
         return self.__loop__()
 
     def __loop__(self):
+        """ Loop that delivers events to the nodes, calculates time, distances and discards events.
+
+        Returns:
+            [array of events] -- All the events that occurred in the simulation
+        """
 
         # creating a sorted event list
         ordered_events = []
@@ -91,6 +127,11 @@ class FaultySimulator(DiscreteEventSimulator):
         return ordered_events
 
     def __exec__(self, event):
+        """ Node handles the event, and its results are translated into simulator events.
+
+        Arguments:
+            event {(instant, (src, dst, data))} -- Has information about the instant, its source, the destiny and the actual payload
+        """
 
         # unfolding event properties
         instant, src, dst, data = event[0], event[1][0], event[1][1], event[1][2]

@@ -7,6 +7,19 @@ from sim.faulty import FaultySimulator
 
 
 def create_topology(graph_type, vertices, initial_value, fanout, no_news):
+    """ Create a graph topology depending on the type
+
+    Arguments:
+        graph_type {GraphType} -- Type of the graph to be generated
+        vertices {int} -- number of vertices of the graph
+        initial_value {int} -- initial value of each node
+        fanout {int} -- fanout value for multicast
+        no_news {int} -- size of the no_news array
+
+    Returns:
+        [nodes] -- generated nodes
+        [distances] -- generated distances
+    """
 
     graph = None
 
@@ -35,6 +48,21 @@ def create_topology(graph_type, vertices, initial_value, fanout, no_news):
 
 
 def run(graph_type, vertices, initial_value, fanout, no_news, error_percentage):
+    """ Run a configuration of a simulation.
+
+    Arguments:
+        graph_type {GraphType} -- Type of the graph to be generated
+        vertices {int} -- number of vertices of the graph
+        initial_value {int} -- initial value of each node
+        fanout {int} -- fanout value for multicast
+        no_news {int} -- size of the no_news array
+        error_percentage {float} -- probability for errors to occur
+
+    Returns:
+        vertices [int] -- number of vertices of the graph
+        current_instant [int] -- instant of time when simulator stopped
+        message_count [int] -- number of messages the simulator handled
+    """
 
     nodes, distances = create_topology(graph_type, vertices, initial_value, fanout, no_news)
 
@@ -53,6 +81,23 @@ def run(graph_type, vertices, initial_value, fanout, no_news, error_percentage):
 
 
 def produce_results(graph_type, initial_value, fanout, no_news, error_percentage, times=10, max_bound=252):
+    """ Produce result for many configurations of simulations.
+
+    Arguments:
+        graph_type {GraphType} -- Type of the graph to be generated
+        initial_value {int} -- initial value of each node
+        fanout {int} -- fanout value for multicast
+        no_news {int} -- size of the no_news array
+        error_percentage {float} -- probability for errors to occur
+
+    Keyword Arguments:
+        times {int} -- number of repetitions of a specified setting (default: {10})
+        max_bound {int} -- maximum number of vertices to test (default: {252})
+
+    Returns:
+        durations [dictionary] -- dictionary of key-array for vertices-values respecting to times
+        messages [dictionary] -- dictionary of key-array for vertices-values respecting to messages
+    """
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
 
@@ -80,6 +125,6 @@ def produce_results(graph_type, initial_value, fanout, no_news, error_percentage
 
 
 if __name__ == '__main__':
-    __durations, __messages = produce_results(GraphType.RANDOM_GEOMETRIC, 10, 3, 5, 0.1, 10, 32)
+    __durations, __messages = produce_results(GraphType.WATTS_STROGATZ, 10, 3, 5, 0.1, 10, 32)
     print(__durations)
     print(__messages)

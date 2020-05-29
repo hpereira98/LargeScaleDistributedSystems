@@ -7,36 +7,59 @@ from enum import Enum
 
 
 class PushSumNode(Node):
+    """ Class that implements the behaviour of a Node
 
-    # - id: identification number 
-    # - role: node role in the network
-    # - neighbors: adjacent nodes id's
+    Arguments:
+        Node {Node} -- interface to implement
+    """
+
     def __init__(self, id, distances, initial_value, fanout, nonews):
+        """ Constructor for the PushSumNode
 
-        # node id
+        Arguments:
+            id {int} -- [description]
+            distances {dictionary} -- dictionary of pairs and distances
+            initial_value {int} -- value that a node holds
+            fanout {int} -- fanout value that represents the number of neighbors to send a message
+            nonews {int} -- number of the no news array
+
+        Instantiated Attributes:
+            id {int} -- node id
+            message_id {int} -- # unique message ids
+            current_instant {int} -- # instant
+            sum {float} -- sum calculated value
+            weight {float} -- weight calculated value
+            aggregate {float} -- aggregate calculated value
+            round {int} -- round info
+            responded {dictionary} -- dictionary of the neighbors who have responded in each round
+            requested {dictionary} -- dictionary of the neighbors who have requested each round
+            neighbors {array} -- direct neighbors 
+            fanout {int} -- fanout value
+            rto {int} -- Initial Retransmission Timeout (in milliseconds)
+            srtt {int} -- Smoothed Round-trip Time (-1 as it has no initial value)
+            rttvar {int} -- Variation in Round-trip time (-1 as it has no initial value)
+            min_rto {int} -- Minimum Retransmission Timeout
+            max-rto {int} -- Maximum Retransmission Timeout
+            timers {dictionary} -- Timers to calculate RTT
+            no_news {BoundedQueue} -- Termination info
+        """
+
         self.id = id
 
-        # unique message ids
         self.message_id = -1
 
-        # instant
         self.current_instant = 0
 
-        # aggregation info
         self.sum = initial_value
         self.weight = 0
         self.aggregate = self.sum
 
-        # round info
         self.round = 0
 
-        # dictionary of the neighbors who have responded in each round
         self.responded = {}
 
-        # dictionary of the neighbors who have requested each round
         self.requested = {}
 
-        # setting neighbors
         self.neighbors = []
         for (src, dst) in distances.keys():
             if src == self.id:
@@ -48,23 +71,27 @@ class PushSumNode(Node):
         self.fanout = fanout if fanout <= num_neighbors else num_neighbors
 
         # Fault detection parameters (based on TCP)
-        self.rto = {neighbor: 60 for neighbor in self.neighbors}  # Initial Retransmission Timeout (in miliseconds)
-        self.srtt = {neighbor: -1 for neighbor in
-                     self.neighbors}  # Smoothed Round-trip Time (-1 as it has no initial value)
-        self.rttvar = {neighbor: -1 for neighbor in
-                       self.neighbors}  # Variation in Round-trip time (-1 as it has no initial value)
+        self.rto = {neighbor: 60 for neighbor in self.neighbors} 
+        self.srtt = {neighbor: -1 for neighbor in self.neighbors}
+        self.rttvar = {neighbor: -1 for neighbor in self.neighbors}
+        self.min_rto = 20 
+        self.max_rto = 1000 
 
-        self.min_rto = 20  # Minimum Retransmission Timeout
-        self.max_rto = 1000  # Maximum Retransmission Timeout
+        self.timers = {}
 
-        # Timers to calculate RTT
-        self.timers = {}  # Timers for RTT
-
-        # Termination info
         self.no_news = BoundedQueue(nonews)
 
-    # invoked from simulator
     def handle(self, src, data, instant):
+        """ Method invoked from simulator to handle events. Handle events depending on their type.
+
+        Arguments:
+            src {string} -- origin of the event
+            data {Message} -- payload of the event
+            instant {int} -- time the event occurred
+
+        Returns:
+            [array] -- events produced
+        """
 
         # saving simulator instant
         self.current_instant = instant
@@ -85,16 +112,21 @@ class PushSumNode(Node):
 
             return self.__ack__(src, id)
 
-        elif type is MessageType.GC:
-
-            return self.__gc__(src)
-
         else:
 
             return []
 
-    # invoked when received a gossip message
     def __gossip__(self, src, id, payload):
+        """ Method invoked when received a gossip message.
+
+        Arguments:
+            src {string} -- origin of the event
+            id {int} -- id of the message
+            payload {Message} -- Message payload
+
+        Returns:
+            [array] -- events produced
+        """
 
         # triplet received
         type, round, sum, weight = payload
@@ -157,6 +189,14 @@ class PushSumNode(Node):
         return res + self.__increment_round__()
 
     def __retransmission__(self, event):
+        """ Method invoked when received a retransmission message. Retransmits an event and adjusts timeouts.
+
+        Arguments:
+            event {Event} -- event to be retransmitted
+
+        Returns:
+            [array] -- events produced
+        """
 
         # Unpacking event
         dst, data, delay = event
@@ -176,6 +216,15 @@ class PushSumNode(Node):
         return self.__safe_send__(event)
 
     def __ack__(self, src, id):
+        """ Method invoked when received an ack message. Adjust timers.
+
+        Arguments:
+            src {string} -- origin of an event
+            id {int} -- id of an event
+
+        Returns:
+            [array] -- events produced
+        """
 
         # Calculating Round-trip Time with node
         rtt = self.current_instant - self.timers[id]
@@ -201,8 +250,16 @@ class PushSumNode(Node):
 
         return []
 
-    # send a message to one node
     def __respond__(self, dst, round):
+        """ Sends an aggregation pair to one specific node.
+
+        Arguments:
+            dst {string} -- destiny of the message
+            round {int} -- round of that message
+
+        Returns:
+            [array] -- events produced
+        """
 
         self.sum /= 2
         self.weight /= 2
@@ -212,8 +269,12 @@ class PushSumNode(Node):
 
         return self.__safe_send__(event)
 
-    # checks if all neighbours have responded in this round and if such increments it
     def __increment_round__(self):
+        """ Checks if all neighbors have responded in this round and if such increments it
+
+        Returns:
+            [array] -- events produced
+        """
 
         res = []
 
@@ -233,8 +294,12 @@ class PushSumNode(Node):
 
         return res
 
-    # multicast pair to neighbors
     def __multi_request__(self):
+        """ Multicast an aggregation pair to a fanout direct neighbors
+
+        Returns:
+            [array] -- events produced
+        """
 
         res = []
 
@@ -258,8 +323,15 @@ class PushSumNode(Node):
 
         return res
 
-    # Creates retransmission messages to make sure message is delivered
     def __safe_send__(self, event):
+        """ Creates retransmission messages to make sure message is delivered.
+
+        Arguments:
+            event {Event} -- Event to be sent
+
+        Returns:
+            [array] -- events produced
+        """
 
         # Adding event with unique subround number
         res = [event]
@@ -276,14 +348,26 @@ class PushSumNode(Node):
         return res
 
     def __id__(self):
+        """ Create an unique ID for an event.
+
+        Returns:
+            [string] -- Unique ID of a message
+        """
 
         # Incrementing ID
         self.message_id += 1
 
         return "[{},{}]".format(self.id, self.message_id)
 
-    # Transforms event into unique event
     def __identify__(self, event):
+        """ Transforms event into unique event.
+
+        Arguments:
+            event {Event} -- event to be made unique.
+
+        Returns:
+            [Event] -- result event
+        """
 
         # Unpacking event
         dst, data, delay = event
@@ -295,14 +379,22 @@ class PushSumNode(Node):
         return [dst, (type, id, payload), delay]
 
 
-# different types of messages recognized by this type of node
 class MessageType(Enum):
+    """ Different types of messages recognized by this type of node.
+
+    Arguments:
+        Enum {Enumeration} -- type of the class
+    """
     GOSSIP = 1
     RETRANSMISSION = 2
     ACK = 3
-    GC = 4
 
 
 class GossipType(Enum):
+    """ Different types of Gossip Messages recognized by this type of node.
+
+    Arguments:
+        Enum {Enumeration} -- type of the Gossip Message
+    """
     REQUEST = 1
     RESPONSE = 2
