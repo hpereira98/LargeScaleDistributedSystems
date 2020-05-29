@@ -6,6 +6,15 @@ from network.graphtype import GraphType
 
 
 def calculate_points(dictionary):
+    """ Calculate the average of the lists of each key.
+
+    Arguments:
+        dictionary {dictionary} -- data struct that holds an array of values for each key
+
+    Returns:
+        x [array] -- array of x coordinates
+        y [array] -- array of y coordinates
+    """
 
     x = []
     y = []
