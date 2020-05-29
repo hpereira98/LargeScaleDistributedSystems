@@ -80,7 +80,7 @@ def run(graph_type, vertices, initial_value, fanout, no_news, error_percentage):
     return vertices, faulty_sim.current_instant, message_count
 
 
-def produce_results(graph_type, initial_value, fanout, no_news, error_percentage, times=10, max_bound=252):
+def produce_results(graph_type, initial_value, fanout, no_news, error_percentage, times=10, max_bound=256):
     """ Produce result for many configurations of simulations.
 
     Arguments:
