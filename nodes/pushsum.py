@@ -85,10 +85,6 @@ class PushSumNode(Node):
 
             return self.__ack__(src, id)
 
-        elif type is MessageType.GC:
-
-            return self.__gc__(src)
-
         else:
 
             return []
@@ -300,7 +296,6 @@ class MessageType(Enum):
     GOSSIP = 1
     RETRANSMISSION = 2
     ACK = 3
-    GC = 4
 
 
 class GossipType(Enum):
